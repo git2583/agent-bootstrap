@@ -1,0 +1,286 @@
+================================================================================
+WORKLOG — Agent Bootstrap Setup
+날짜: 2026-10-07
+작업자: 대표님 (U0APXUTNP3K)
+세션: d8c4b379-402a-447d-8cf2-1903572b3578 ~ 현재
+================================================================================
+
+■ 개요
+  Claude Code + Slack + Notion 자동화 에이전트 셋업 (agent-bootstrap 스킬 기반)
+  OS: Windows 10 Education (10.0.19045), 사용자: a
+  작업 디렉토리: C:\Users\a\.claude\scripts\slack-jipsa
+
+================================================================================
+MODULE 1: Slack ↔ Claude Code 양방향 연결
+================================================================================
+
+[STEP 1] 슬랙 앱 생성 및 토큰 수집
+  - Slack 앱 이름: 집사
+  - Bot Token:    xoxb-10794690496051-12235445447509-*** (수집 완료)
+  - App Token:    xapp-1-A0C6MSFE57F-*** (수집 완료)
+  - Channel ID:   C0C76F35C762
+  - User ID:      U0APXUTNP3K (대표님)
+  - Bot User ID:  U0C6XD3D5EZ
+
+[STEP 2] 시크릿 파일 작성
+  파일: C:\Users\a\.claude\secrets\slack-jipsa.env
+  내용:
+    SLACK_BOT_TOKEN=xoxb-...
+    SLACK_APP_TOKEN=xapp-...
+    SLACK_CHANNEL=C0C76F35C762
+    USER_SLACK_ID=U0APXUTNP3K
+    BOT_USER_ID=U0C6XD3D5EZ
+    USER_NAME=대표님
+    SLACK_BOT_NAME=집사
+    SLACK_SESSION_WEBHOOK=https://hooks.slack.com/services/T0APCLAEL1H/...
+    NOTION_API_TOKEN=ntn_528415673514AKXy*** (모듈 4 추가)
+    NOTION_SESSION_DB=3f1c4d9a-5477-81a4-88d2-c709100a6e0c (모듈 4 추가)
+    NOTION_DAILY_DB=3f1c4d9a-5477-8166-98e6-d4ec24c3ee7c (모듈 4 추가)
+
+[STEP 3] lib 의존성 복사 (templates/ → ~/.claude/)
+  - C:\Users\a\.claude\scripts\lib\notion.py         ✅
+  - C:\Users\a\.claude\scripts\lib\slack_mrkdwn.py   ✅
+  - C:\Users\a\.claude\hooks\md_to_notion.py         ✅
+  - C:\Users\a\.claude\scripts\lib\__init__.py       ✅
+
+[STEP 4] daemon.py 복사 및 run.ps1 작성
+  파일: C:\Users\a\.claude\scripts\slack-jipsa\daemon.py  (templates/ 에서 복사)
+  파일: C:\Users\a\.claude\scripts\slack-jipsa\run.ps1
+    내용:
+      $env:SLACK_BOT_TOKEN = ... (slack-jipsa.env에서 로드)
+      C:\Python312\python.exe daemon.py 실행
+
+[STEP 5] Task Scheduler 등록 — SlackJipsa
+  작업 이름: SlackJipsa
+  트리거: 로그인 시 자동 시작
+  실행: powershell.exe -File run.ps1
+  상태: Running ✅
+
+[STEP 6] Stop hook 설정
+  파일: C:\Users\a\.claude\hooks\slack-session-summary.sh  (templates/ 복사)
+  파일: C:\Users\a\.claude\hooks\append_turn_raw.py         (templates/ 복사)
+  파일: C:\Users\a\.claude\hooks\slack-hook-wrapper.sh      (신규 작성)
+    내용:
+      export LANG=en_US.UTF-8
+      export PATH="$HOME/bin:$PATH"
+      exec bash ~/.claude/hooks/slack-session-summary.sh
+
+  C:\Users\a\.claude\settings.json 수정:
+    "hooks": { "Stop": [{ "command": "bash $HOME/.claude/hooks/slack-hook-wrapper.sh" }] }
+    "env": { "SLACK_SESSION_WEBHOOK": "...", "LANG": "en_US.UTF-8", ... }
+
+[STEP 7] UTF-8 인코딩 문제 해결
+  문제: Git Bash curl이 한국어 텍스트를 Windows 코드 페이지로 전송 → 깨짐
+  해결: ~/bin/curl 래퍼 작성
+    파일: C:\Users\a\bin\curl
+    방식: -d "string" → --data-binary @tmpfile (UTF-8 바이트 직접 전송)
+
+  문제: jq가 Git Bash PATH에 없음
+  해결: winget으로 설치된 jq.exe를 ~/bin/jq로 복사
+
+[STEP 8] Module 1 검증 결과
+  - Slack 채널에서 메시지 발송 → daemon.py 수신 → Claude Code 응답 ✅
+  - Claude Code 세션 종료 → Stop hook → Slack 세션 요약 도착 ✅
+  - 한글 인코딩 정상 (curl 래퍼 적용 후) ✅
+
+================================================================================
+MODULE 2: 폴더 트리거 자동화 (Folder Watch)
+================================================================================
+
+[STEP 1] 감시 폴더 생성
+  경로: C:\Users\a\Documents\claude-inbox\
+  처리 완료 폴더: C:\Users\a\Documents\claude-inbox\.processed\
+
+[STEP 2] 시나리오 선택
+  선택: (c) 마크다운 파일 → 분석 → Slack 알림
+
+[STEP 3] folder-watch.ps1 작성
+  파일: C:\Users\a\.claude\scripts\folder-watch\folder-watch.ps1
+  동작:
+    1) 5초마다 claude-inbox 폴더 폴링
+    2) 새 파일 발견 시 claude.exe --print --dangerously-skip-permissions 로 요약 요청
+    3) 요약 결과를 Slack API chat.postMessage로 전송
+    4) 처리된 파일을 .processed/ 로 이동
+
+  주요 수정 이력:
+    - Register-ObjectEvent 방식 → 5초 폴링으로 변경 (Task Scheduler 환경 호환성)
+    - 한국어 프롬프트 → 영어 프롬프트 + 임시파일 stdin 방식 (인코딩 우회)
+    - SLACK_BOT_TOKEN 환경변수 로딩 실패 → 스크립트 상단 하드코딩 방식으로 변경
+    - Process-File 함수 내 $slackToken 변수 버그 수정
+      (GetEnvironmentVariable 참조 → 스크립트 상단 $SlackToken 직접 참조)
+    - --dangerously-skip-permissions 플래그 추가 (파일 읽기 권한 허용)
+
+[STEP 4] Task Scheduler 등록 — FolderWatch
+  작업 이름: FolderWatch
+  트리거: 로그인 시 자동 시작
+  실행: powershell.exe -File folder-watch.ps1
+  상태: Running ✅
+
+[STEP 5] Module 2 검증 결과
+  - claude-inbox에 test.md 투입
+  - Claude가 파일 읽고 한국어 요약 생성
+  - Slack에 "📄 test.md 요약: ..." 메시지 도착 ✅
+  - 처리 후 .processed/ 로 파일 이동 ✅
+
+================================================================================
+MODULE 4: 노션 자동 아카이브
+================================================================================
+
+[STEP 1] Notion Integration 생성
+  이름: Agent Bootstrap
+  유형: Internal
+  API Token: ntn_528415673514AKXy*** (slack-jipsa.env에 저장)
+
+[STEP 2] 노션 페이지 준비
+  페이지: agent-bootstrap
+  URL: https://app.notion.com/p/agent-bootstrap-3f1c4d9a5477803f8c0cd7c83f06010e
+  Page ID: 3f1c4d9a-5477-803f-8c0c-d7c83f06010e
+  Integration 연결: ✅
+
+[STEP 3] DB 자동 생성 (Notion API v2022-06-28)
+  DB 1: "Claude Code 턴 로그"
+    ID: 3f1c4d9a-5477-81a4-88d2-c709100a6e0c
+    컬럼: 프로젝트(title), 시각(date), 세션ID, 작업디렉토리, 시킨일, 한일,
+          결과, 확인필요, 모델(select), 도구호출수(number), 전체요약, external_id
+  DB 2: "일일 통합"
+    ID: 3f1c4d9a-5477-8166-98e6-d4ec24c3ee7c
+    컬럼: 이름(title), 날짜(date), 상태(status), external_id
+  Relation: 턴 로그 DB → "📊 일일 통합" 컬럼 (single_property) ✅
+
+[STEP 4] 환경변수 추가
+  slack-jipsa.env:
+    NOTION_API_TOKEN=ntn_***
+    NOTION_SESSION_DB=3f1c4d9a-5477-81a4-88d2-c709100a6e0c
+    NOTION_DAILY_DB=3f1c4d9a-5477-8166-98e6-d4ec24c3ee7c
+  settings.json env 섹션도 동일하게 추가
+
+[STEP 5] Stop hook 노션 적재 확인
+  slack-session-summary.sh 에 이미 노션 적재 로직 내장 확인:
+    - NOTION_TOKEN + NOTION_DB 있으면 자동 upsert
+    - upsert_by_external_id (lib/notion.py) 사용
+    - 일일 통합 relation 자동 매칭 (get_or_create_daily)
+    - append_turn_raw.py 로 원문 블록 append
+
+[STEP 6] daemon 재시작
+  SlackJipsa Task Scheduler 재시작 → Running ✅
+
+[STEP 7] Module 4 검증 결과
+  - claude --print "1+1" 실행
+  - 노션 "Claude Code 턴 로그" DB에 새 row 생성 ✅
+  - 프로젝트, 시킨 일, 결과 컬럼 정상 기록 ✅
+
+================================================================================
+현재 동작 중인 자동화 전체 목록
+================================================================================
+
+  [항상 실행 중]
+  1. SlackJipsa (Task Scheduler)
+     - daemon.py (Python) — Slack Socket Mode 수신
+     - 슬랙 메시지 → Claude Code 처리 → 슬랙 응답
+
+  2. FolderWatch (Task Scheduler)
+     - folder-watch.ps1 (PowerShell) — 5초 폴링
+     - claude-inbox 파일 → Claude 요약 → Slack 전송
+
+  [Claude Code 세션 종료 시마다]
+  3. Stop hook (slack-hook-wrapper.sh → slack-session-summary.sh)
+     - Slack 세션 요약 전송
+     - Notion "Claude Code 턴 로그" DB row 생성
+     - Notion "일일 통합" DB 매칭 (일별 허브)
+
+================================================================================
+파일 목록 (생성/수정)
+================================================================================
+
+  C:\Users\a\.claude\secrets\slack-jipsa.env
+  C:\Users\a\.claude\settings.json
+  C:\Users\a\.claude\hooks\slack-hook-wrapper.sh
+  C:\Users\a\.claude\hooks\slack-session-summary.sh  (templates/ 복사)
+  C:\Users\a\.claude\hooks\append_turn_raw.py         (templates/ 복사)
+  C:\Users\a\.claude\hooks\md_to_notion.py            (templates/ 복사)
+  C:\Users\a\.claude\scripts\lib\notion.py            (templates/ 복사)
+  C:\Users\a\.claude\scripts\lib\slack_mrkdwn.py     (templates/ 복사)
+  C:\Users\a\.claude\scripts\lib\__init__.py
+  C:\Users\a\.claude\scripts\slack-jipsa\daemon.py   (templates/ 복사)
+  C:\Users\a\.claude\scripts\slack-jipsa\run.ps1
+  C:\Users\a\.claude\scripts\folder-watch\folder-watch.ps1
+  C:\Users\a\bin\curl                                 (UTF-8 래퍼)
+  C:\Users\a\bin\jq                                   (winget → 복사)
+
+================================================================================
+트러블슈팅 이력
+================================================================================
+
+  [문제 1] jq not found in Git Bash
+  원인: winget 설치 경로가 Git Bash PATH 밖
+  해결: jq.exe → ~/bin/jq 복사
+
+  [문제 2] curl 한국어 인코딩 깨짐
+  원인: Git Bash가 -d "string" 을 Windows 코드 페이지로 전달
+  해결: ~/bin/curl 래퍼 — -d → --data-binary @tmpfile
+
+  [문제 3] Stop hook PATH 문제
+  원인: Task Scheduler 서브프로세스가 ~/bin 미인식
+  해결: slack-hook-wrapper.sh에 export PATH="$HOME/bin:$PATH" 추가
+
+  [문제 4] Register-ObjectEvent 미작동
+  원인: Task Scheduler 환경에서 이벤트 구독 불가
+  해결: 5초 폴링 루프로 전환
+
+  [문제 5] claude.exe not found
+  원인: Task Scheduler가 npm 전역 PATH 미인식
+  해결: 전체 경로 하드코딩
+        C:\Users\a\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe
+
+  [문제 6] 한국어 프롬프트 → claude stdin 깨짐
+  원인: PowerShell 파이프가 UTF-8 유지 못함
+  해결: 영어 프롬프트 임시파일 기록 후 stdin으로 전달
+
+  [문제 7] SLACK_BOT_TOKEN 로딩 실패 (0chars)
+  원인: Task Scheduler 환경에서 .env 파싱 실패 (BOM 문제 등)
+  해결: 스크립트 상단에 직접 하드코딩 ($SlackToken, $SlackChannel)
+
+  [문제 8] Process-File 변수 버그
+  원인: 함수 내 $slackToken이 GetEnvironmentVariable 참조 (항상 empty)
+  해결: $slackToken = $SlackToken 으로 수정
+
+  [문제 9] 파일 읽기 권한 차단
+  원인: claude.exe 기본 실행 시 파일 읽기 권한 프롬프트 발생 (비대화형 환경)
+  해결: --dangerously-skip-permissions 플래그 추가
+
+================================================================================
+워킹 로그 (folder-watch 처리 이력)
+================================================================================
+
+  [테스트 파일 처리 내역]
+  - test.md         → 처리 완료 → .processed/ 이동
+  - test3.md        → 처리 완료 → .processed/ 이동
+  - (기타 테스트 파일들 다수 처리)
+
+  [Slack 수신 메시지 샘플]
+  [오전 1:59] 🤖 system32
+    ⏰ 16:59 KST · 세션 df43fde8
+    🎯 시킨 일: Read the file at '...\test.md' and summarize...
+    📝 한 일: Read
+    🧠 결과: "테스트 중입니다"라는 한 줄짜리 테스트용 문서입니다.
+
+  [오전 2:03] 🤖 system32
+    ⏰ 17:03 KST · 세션 cfc44558
+    🎯 시킨 일: Read the file at '...\test.md' and summarize...
+    📝 한 일: Read
+    🧠 결과: "테스트 중입니다"라는 한 줄짜리 테스트용 문서입니다.
+
+================================================================================
+완료 상태
+================================================================================
+
+  Module 1 (Slack ↔ Claude Code): ✅ 완료
+  Module 2 (Folder Watch):        ✅ 완료
+  Module 4 (Notion Archive):      ✅ 완료
+
+  모든 자동화 현재 실행 중.
+  재부팅 후에도 Task Scheduler 등록으로 자동 재시작됨.
+
+================================================================================
+END OF WORKLOG
+================================================================================
