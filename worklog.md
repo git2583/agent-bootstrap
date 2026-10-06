@@ -328,5 +328,41 @@ MODULE 3: Slack + 폴더 합치기
   해결: System.Diagnostics.ProcessStartInfo + StandardOutputEncoding = UTF8
 
 ================================================================================
+트러블슈팅 추가 이력 (Module 1 재디버깅 — 2026-10-07)
+================================================================================
+
+  [문제 12] Slack → daemon 메시지 미수신 (Socket Mode 연결은 됨)
+  원인: Slack 앱 OAuth 스코프에 channels:history, groups:history, im:history 누락
+  해결: api.slack.com/apps → OAuth & Permissions → Bot Token Scopes에 추가 후 재설치
+        추가 스코프: channels:history, groups:history, im:history, reactions:write
+
+  [문제 13] SLACK_CHANNEL 채널 ID 불일치
+  원인: .env의 SLACK_CHANNEL=C0C76F35C762 (12자) — 실제 채널은 C0C76F35C76 (11자)
+        daemon.py handle_message의 채널 필터에서 걸려 메시지 무시
+  해결: slack-jipsa.env의 SLACK_CHANNEL을 C0C76F35C76 으로 수정
+
+  [문제 14] Python subprocess가 claude.cmd 실행 불가
+  원인: Windows에서 subprocess.run(['claude', ...])는 .cmd 파일을 직접 실행 못함
+        (shell=True 없이 CreateProcess 사용 → FileNotFoundError → 스레드 조용히 종료)
+  해결: slack-jipsa.env에 CLAUDE_EXE 추가:
+          CLAUDE_EXE=C:\Users\a\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe
+        daemon.py _run_claude()에서 ENV.get('CLAUDE_EXE', 'claude') 로 읽어 사용
+
+  [문제 15] Task Scheduler WorkingDirectory 미설정
+  원인: 작업 등록 시 WorkingDirectory 미지정 → daemon.py의 상대경로 참조 실패 가능
+  해결: Register-ScheduledTask -Action에 -WorkingDirectory 추가
+
+================================================================================
+최종 검증 결과 (2026-10-07)
+================================================================================
+
+  Module 1 (Slack ↔ Claude Code):
+    - Slack 채널 메시지 → daemon 수신 → ⏳ 이모지 → Claude 응답 → ✅ 이모지 ✅
+    - Task Scheduler 자동 시작 (로그인 시) ✅
+  Module 2 (Folder Watch):        ✅ 완료
+  Module 3 (Slack + 폴더 합치기): ✅ 완료
+  Module 4 (Notion Archive):      ✅ 완료
+
+================================================================================
 END OF WORKLOG
 ================================================================================

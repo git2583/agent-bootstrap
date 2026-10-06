@@ -105,13 +105,13 @@ agent-bootstrap/
 
 | 모듈 | 상태 | 비고 |
 |------|------|------|
-| Module 1: Slack ↔ Claude Code | ✅ 완료 | SlackJipsa Task Scheduler 실행 중 |
+| Module 1: Slack ↔ Claude Code | ✅ 완료 | SlackJipsa Task Scheduler 실행 중, reactions:write ✅ |
 | Module 2: 폴더 트리거 | ✅ 완료 | FolderWatch Task Scheduler 실행 중 |
 | Module 3: Slack + 폴더 합치기 | ✅ 완료 | 시작·완료 알림 + 요약 본문 Slack 전송 |
 | Module 4: 노션 자동 적재 | ✅ 완료 | Notion DB 생성 완료, Stop hook 연동 |
 
 **설치된 파일 위치:**
-- 시크릿: `C:\Users\a\.claude\secrets\slack-jipsa.env`
+- 시크릿: `C:\Users\a\.claude\secrets\slack-jipsa.env` (CLAUDE_EXE, SLACK_CHANNEL=C0C76F35C76 포함)
 - 설정: `C:\Users\a\.claude\settings.json`
 - Stop hook: `C:\Users\a\.claude\hooks\slack-hook-wrapper.sh`
 - Daemon: `C:\Users\a\.claude\scripts\slack-jipsa\daemon.py`
@@ -137,6 +137,9 @@ agent-bootstrap/
 | chat.postMessage channel_not_found | Bot Token 채널 미가입 | Incoming Webhook URL로 전환 |
 | 폴더워치 한글 출력 깨짐 | PowerShell 파이프 CP949 해석 | ProcessStartInfo + StandardOutputEncoding=UTF8 |
 | Notion row 미생성 | NOTION_SESSION_DB 미설정 | settings.json env 섹션 확인 |
+| daemon 메시지 무시 | SLACK_CHANNEL 값에 여분 문자 (`2`) | C0C76F35C762 → C0C76F35C76 수정 |
+| Python subprocess claude 실행 실패 | .cmd 파일 직접 실행 불가 | CLAUDE_EXE=전체경로.exe 를 .env에 추가 |
+| ⏳✅ 이모지 미작동 | reactions:write 스코프 누락 | Slack 앱 OAuth에 reactions:write 추가 후 재설치 |
 
 ---
 
