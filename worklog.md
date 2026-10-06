@@ -271,15 +271,61 @@ MODULE 4: 노션 자동 아카이브
     🧠 결과: "테스트 중입니다"라는 한 줄짜리 테스트용 문서입니다.
 
 ================================================================================
+MODULE 3: Slack + 폴더 합치기
+================================================================================
+
+[STEP 1] 알림 방식 선택
+  선택: ③ 둘 다 (시작 알림 + 결과 본문)
+
+[STEP 2] folder-watch.ps1 수정
+  파일: C:\Users\a\.claude\scripts\folder-watch\folder-watch.ps1
+  변경 내용:
+    - Post-Slack 함수 추가 (Incoming Webhook 방식)
+    - Process-File 함수에 시작 알림 추가
+    - 완료 시 요약 본문 함께 전송
+
+  주요 수정 이력:
+    - chat.postMessage (Bot Token) → Incoming Webhook URL로 전환
+      원인: channel_not_found 에러 (Bot Token은 채널 멤버십 필요)
+      해결: Stop hook과 동일한 Webhook URL 재사용
+    - 완료 메시지 한글 깨짐 수정
+      원인: claude.exe 출력을 파이프로 캡처 시 CP949로 잘못 해석
+      해결: ProcessStartInfo + StandardOutputEncoding = UTF8 방식으로 직접 캡처
+    - 완료 메시지 포맷 단순화 (*bold*, 줄바꿈 → 평문)
+      원인: Webhook JSON에서 mrkdwn 마크다운이 깨져 전송됨
+
+[STEP 3] FolderWatch Task Scheduler 재시작
+  상태: Running ✅
+
+[STEP 4] Module 3 검증 결과
+  - claude-inbox에 test.md 투입
+  - Slack 메시지 1: ⏳ test.md 처리 시작 ✅
+  - Slack 메시지 2: ✅ test.md - 모듈3의 두 번째 메시지에서 글자가 깨지는... ✅
+  - 한글 인코딩 정상 ✅
+
+================================================================================
 완료 상태
 ================================================================================
 
   Module 1 (Slack ↔ Claude Code): ✅ 완료
   Module 2 (Folder Watch):        ✅ 완료
+  Module 3 (Slack + 폴더 합치기): ✅ 완료
   Module 4 (Notion Archive):      ✅ 완료
 
   모든 자동화 현재 실행 중.
   재부팅 후에도 Task Scheduler 등록으로 자동 재시작됨.
+
+================================================================================
+트러블슈팅 추가 이력 (Module 3)
+================================================================================
+
+  [문제 10] chat.postMessage channel_not_found
+  원인: Bot Token으로 직접 API 호출 시 채널 미가입 상태
+  해결: Incoming Webhook URL 방식으로 전환 (Stop hook과 동일)
+
+  [문제 11] 완료 메시지 한글 깨짐
+  원인: PowerShell 파이프로 claude.exe 출력 캡처 시 CP949 해석
+  해결: System.Diagnostics.ProcessStartInfo + StandardOutputEncoding = UTF8
 
 ================================================================================
 END OF WORKLOG
