@@ -21,7 +21,7 @@
 
 ## 실제 설치 사례 (Windows 10, 2026-10-07)
 
-아래는 이 키트로 Module 1·2·4를 실제 셋업한 결과입니다.
+아래는 이 키트로 전체 4개 모듈을 실제 셋업한 결과입니다.
 
 ### 동작 중인 자동화
 
@@ -31,17 +31,16 @@
 | 2 | **FolderWatch** | Task Scheduler + PowerShell 5초 폴링 | `claude-inbox/` 파일 투입 → Claude 요약 → Slack 전송 |
 | 3 | **Stop hook** | Claude Code hooks.Stop | 세션 종료 → Slack 요약 + Notion DB row 자동 생성 |
 
-### Slack 세션 요약 예시
+### Module 3: 폴더 처리 Slack 알림 예시
+
+파일을 `claude-inbox/`에 넣으면 두 메시지가 순서대로 도착:
 
 ```
-🤖 system32
-⏰ 17:03 KST · 세션 cfc44558
-🎯 시킨 일: Read the file at '...\test.md' and summarize...
-📝 한 일: Read
-🧠 결과: "테스트 중입니다"라는 한 줄짜리 테스트용 문서입니다.
+⏳ test.md 처리 시작
+✅ test.md - 모듈3의 두 번째 메시지에서 글자가 깨지는 문제를 해결하는 중이라는 내용입니다.
 ```
 
-### Notion 자동 적재 결과
+### Module 4: Notion 자동 적재 결과
 
 - **Claude Code 턴 로그** DB: 세션마다 프로젝트·시킨일·결과·모델·도구호출수 자동 기록
 - **일일 통합** DB: 날짜별 허브 row — 해당 날의 모든 턴 로그를 relation으로 묶음
@@ -55,6 +54,8 @@
 | Stop hook PATH 누락 | `slack-hook-wrapper.sh`에 `export PATH="$HOME/bin:$PATH"` 추가 |
 | 비대화형 환경 파일 읽기 차단 | `--dangerously-skip-permissions` 플래그 추가 |
 | .env 토큰 파싱 실패 (BOM) | 스크립트 상단 직접 하드코딩으로 우회 |
+| chat.postMessage channel_not_found | Bot Token → Incoming Webhook URL로 전환 |
+| 폴더워치 한글 출력 깨짐 | ProcessStartInfo + StandardOutputEncoding = UTF8 |
 
 > 전체 작업 이력은 [worklog.md](./worklog.md) 참고.
 

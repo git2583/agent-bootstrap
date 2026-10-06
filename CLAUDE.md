@@ -107,7 +107,7 @@ agent-bootstrap/
 |------|------|------|
 | Module 1: Slack ↔ Claude Code | ✅ 완료 | SlackJipsa Task Scheduler 실행 중 |
 | Module 2: 폴더 트리거 | ✅ 완료 | FolderWatch Task Scheduler 실행 중 |
-| Module 3: Slack + 폴더 합치기 | — | 미진행 |
+| Module 3: Slack + 폴더 합치기 | ✅ 완료 | 시작·완료 알림 + 요약 본문 Slack 전송 |
 | Module 4: 노션 자동 적재 | ✅ 완료 | Notion DB 생성 완료, Stop hook 연동 |
 
 **설치된 파일 위치:**
@@ -134,6 +134,8 @@ agent-bootstrap/
 | claude.exe not found | Task Scheduler PATH 미인식 | 전체 경로 하드코딩 |
 | 파일 읽기 권한 차단 | 비대화형 실행 시 권한 프롬프트 | `--dangerously-skip-permissions` 추가 |
 | SLACK_BOT_TOKEN 0chars | Task Scheduler .env 파싱 실패 | 스크립트 상단 직접 하드코딩 |
+| chat.postMessage channel_not_found | Bot Token 채널 미가입 | Incoming Webhook URL로 전환 |
+| 폴더워치 한글 출력 깨짐 | PowerShell 파이프 CP949 해석 | ProcessStartInfo + StandardOutputEncoding=UTF8 |
 | Notion row 미생성 | NOTION_SESSION_DB 미설정 | settings.json env 섹션 확인 |
 
 ---
