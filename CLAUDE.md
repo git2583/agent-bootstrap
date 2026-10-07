@@ -140,6 +140,7 @@ agent-bootstrap/
 | daemon 메시지 무시 | SLACK_CHANNEL 값에 여분 문자 (`2`) | C0C76F35C762 → C0C76F35C76 수정 |
 | Python subprocess claude 실행 실패 | .cmd 파일 직접 실행 불가 | CLAUDE_EXE=전체경로.exe 를 .env에 추가 |
 | ⏳✅ 이모지 미작동 | reactions:write 스코프 누락 | Slack 앱 OAuth에 reactions:write 추가 후 재설치 |
+| SlackJipsa·FolderWatch 멈춤 (State=Ready) | 배터리 전환 시 중지 설정, 창 닫힘(0xC000013A) | 5분 반복 트리거 + IgnoreNew, 배터리 중지 해제, 실행시간 제한 없음 |
 
 ---
 
