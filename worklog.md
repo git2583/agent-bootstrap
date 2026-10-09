@@ -389,5 +389,39 @@ MODULE 3: Slack + 폴더 합치기
   - 참고: 웹훅 URL 전체는 로그/문서에 기록하지 않음 (시크릿)
 
 ================================================================================
+Slack 요약 봇 전환 · 3일 자동 정리 · 노션 복구 (2026-10-10)
+================================================================================
+
+  [작업 1] 요약 전송을 웹훅 → 봇 토큰(chat.postMessage)으로 전환
+  - 이유: 웹훅 메시지는 봇 토큰으로 삭제 불가 (chat.delete → cant_delete_message)
+  - ~/.claude/hooks/slack-session-summary.sh (설치본, templates/ 는 수정 안 함):
+    settings.json env 의 SLACK_SUMMARY_CHANNEL 이 있으면 봇 토큰으로 전송,
+    실패하면 기존 SLACK_SESSION_WEBHOOK 으로 폴백
+  - 양파토끼-대화(비공개) 채널에 봇(yangpatokki) 초대 필요: /invite @yangpatokki
+  - 이 채널은 수신용. daemon.py 는 SLACK_CHANNEL(업무자동화)만 응답하므로 변경 없음
+
+  [작업 2] 3일 지난 봇 메시지 자동 삭제
+  - scripts/slack-jipsa/cleanup_bot_messages.py: 채널 2개(업무자동화, 양파토끼-대화),
+    --yes 없으면 미리보기만. 웹훅/사람 메시지는 대상 제외
+  - Task Scheduler 'SlackCleanup' 매일 04:00 (cleanup-hidden.vbs, 로그: logs/cleanup.log)
+  - [문제 17] conversations.history 의 latest 를 소수점 7자리로 보내 Slack 이 무시
+    → 3일 이내 메시지까지 대상이 되어 업무자동화 봇 응답 7개가 잘못 삭제됨
+    해결: latest=f'{cutoff:.6f}' + cutoff 이후 ts 는 대상에서 제외하는 안전장치
+
+  [작업 3] 노션 적재 실패 복구
+  - [문제 18] Stop hook 의 노션 적재가 10-07 이후 계속 page_id=FAIL
+    원인: Git Bash 의 python3 가 Windows Store 스텁(WindowsApps\python3)
+          (오류 출력이 /dev/null 로 버려져 원인이 로그에 안 남음)
+    해결: ~/bin/python3 shim → C:\Python312\python.exe (hook 래퍼가 ~/bin 을 PATH 앞에 둠)
+  - 복구: 10-06 이후 36개 세션 192턴을 hook 사본으로 재적재 (원래 시각, Slack 제외,
+    claude:<세션>:<턴> upsert 라 중복 없음). 성공 192 / 실패 0, 실시간 적재도 정상 확인
+
+  [작업 4] 웹훅 교체
+  - 새 웹훅(…/B0C7NGZJZ0F/…) 적용 (settings.json, secrets/slack-jipsa.env), 전송 테스트 OK
+  - 이전 웹훅(…/B0C801ZPYCW/…) Slack 에서 삭제 → 404 no_service 확인
+  - 이전 URL 이 든 백업 파일(settings.json.bak-*) 및 folder-watch.ps1.bak-webhook 삭제
+  - URL 전체는 문서에 기록하지 않음. 채팅/화면에 붙여넣지 말고 파일로 전달할 것
+
+================================================================================
 END OF WORKLOG
 ================================================================================
